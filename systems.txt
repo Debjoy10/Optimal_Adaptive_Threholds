@@ -1,0 +1,78 @@
+1. DC motor position
+
+states: rotational ang., angular vel., armature current
+output rotational angle
+input armature voltage
+
+Ts = 0.1; % sampling period
+
+J = 3.2284E-6;
+b = 3.5077E-6;
+KK = 0.0274;
+RR = 4;
+LL = 2.75E-6;
+
+Continuous time state space matrices:
+Ac = [0 1 0;
+        0 -b/J KK/J;
+        0 -KK/LL -RR/LL];
+Bc = [0; 0; 1/LL];
+Cc = [1 0 0];
+Dc = [0];
+
+2. Aircraft pitch
+
+states: attack angle, pitch rate, pitch angle
+output pitch angle
+input angle of deflection
+
+Ts = 0.02; % sampling period
+
+Continuous time state space matrices:
+Ac = [-0.313 56.7 0;-0.0139 -0.426 0;0 56.7 0];
+Bc = [0.232;0.0203;0];
+Cc = [0 0 1];
+Dc = zeros(size(Cc,1),size(Bc,2));
+
+3. Electronic Stability Controll (ESP)
+
+states: side slip, yaw rate
+output yaw rate
+input steering angle
+
+Ts=0.04; % sampling period
+
+Discrete time state space matrices:
+A = [0.4450 -0.0458;1.2939 0.4402];
+B = [0.0550;4.5607];
+C = [0 1];
+D = [0];
+    
+4. Suspension Controll
+
+states: car position, car velocity, suspension load position, suspension velocity
+input suspension load force
+output car position
+
+Ts = 0.04; % sampling period
+
+Continuous time state space matrices:
+Ac = [0 1 0 0;-8 -4 8 4;0 0 0 1;80 40 -160 -60];
+Bc = [0;80;20;1120];
+Cc = [1,0,0,0];
+Dc = [0]; 
+
+5. Electronic Wedge brake
+
+states: wege position, wedge velocity
+output braking torque
+input force by dc motor
+
+Ts = 0.005; % sampling period
+
+Continuous time state space matrices:
+Ac = [0  1;8395.1 0];
+Bc = [0; 4.0451];
+Cc = [7992 0];
+Dc = [0];
+
