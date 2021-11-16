@@ -37,6 +37,7 @@ for th = th_all
         end
     end
 
+    %Should this not be in the loop k_a and k_b
     % initialize
     x_a = depth*safex;
     xhat_a = zeros(size(x_a));
