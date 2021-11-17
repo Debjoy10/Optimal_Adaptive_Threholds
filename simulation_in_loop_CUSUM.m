@@ -38,14 +38,7 @@ for th = th_all
     end
 
     %Should this not be in the loop k_a and k_b
-    % initialize
-    x_a = depth*safex;
-    xhat_a = zeros(size(x_a));
-    u_a = -K*xhat_a;
 
-    x = depth*safex;
-    xhat = zeros(size(x));
-    u = -K*xhat;
 
     for k_a=1:timeWindow % attack start
         for k_e=k_a:timeWindow % attack end
@@ -54,6 +47,19 @@ for th = th_all
             S_p = zeros(size_x);
             S_n = zeros(size_x);
             
+            % initialize
+            x_a = depth*safex;
+            %xhat_a = zeros(size(x_a));
+            xhat_a = x_a;
+            u_a = -K*xhat_a;
+
+            x = depth*safex;
+            %xhat = zeros(size(x));
+            xhat = x;
+            u = -K*xhat;
+            
+            r_a = zeros(size_y);
+    
             for i=1:timeWindow
                 % Non-attack scenario
                 x = A*x + B*u; % state updattion in plant side
@@ -72,9 +78,10 @@ for th = th_all
                 if i>=k_a && i<=k_e % attack window
                     y_a = y_a + sensorAttack;
                 end
-                r_a = y_a - C*xhat_a; % residue
                 xhat_a = A*xhat_a + B*u_a + L*r_a;
+                r_a = y_a - C*xhat_a; % residue
                 u_a = - K*xhat_a;
+                
                 if cusum_true 
                     %S_p = max([0, S_p + r_a]); %If residue is +ve, it is added to S_p, if it was -ve, then S_p drops to a min 0
                     %S_n = min([0, S_n + r_a]); %If residue is -ve, it is added to S_n, making it more -ve. If it is +ve, S_n increases, moving towards 0 
