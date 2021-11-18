@@ -1,12 +1,13 @@
 % CPS Group-2: Fixed threshold attack detector for dynamical systems
 %Gives Optimal Delay for fixed threshold algorithm
-function [optimal_delay] = fixed_threshold(~)
+function [optimal_threshold] = fixed_threshold(~)
     timeWindow = 15;
     delay = 0;
     optimal_loss = Inf;
     C = 0.1;
-    D_table = readtable('flies/delay_th=0.05.csv');
+    D_table = readtable('files/delay_th=0.05.csv');
     D_array = table2array(D_table);
+    load('files/delay_to_thresh', 'd_to_th')
     P = zeros(timeWindow,timeWindow);
     while delay < timeWindow
         k_a = 1;
@@ -26,6 +27,12 @@ function [optimal_delay] = fixed_threshold(~)
         end
         delay = delay + 1;
     end
+    disp(optimal_delay)
+    threshold = d_to_th(optimal_delay);
+    disp(threshold)
+    threshold_array = ones(1,timeWindow);
+    optimal_threshold = threshold.*threshold_array;
+    writematrix(optimal_threshold,'files/fixed_threshol.csv')
 end
 
 % Simple function for FP rate
