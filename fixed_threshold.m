@@ -32,7 +32,7 @@ function [optimal_threshold] = fixed_threshold(~)
     disp(threshold)
     threshold_array = ones(1,timeWindow);
     optimal_threshold = threshold.*threshold_array;
-    writematrix(optimal_threshold,'files/fixed_threshol.csv')
+    writematrix(optimal_threshold,'files/fixed_threshold.csv')
 end
 
 % Simple function for FP rate
