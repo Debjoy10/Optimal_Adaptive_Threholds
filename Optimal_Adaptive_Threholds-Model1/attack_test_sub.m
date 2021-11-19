@@ -1,76 +1,69 @@
 clc;
 clear;
 
+% System: motor position control
+J = 3.2284E-6;
+b = 3.5077E-6;
+KK = 0.0274;
+RR = 4;
+LL = 2.75E-6;
 
-% System: Trajectory tracking
-Ac = [-0.313 56.7 0;-0.0139 -0.426 0;0 56.7 0];
-Bc = [0.232;0.0203;0];
-Cc = [0 0 1];
-Dc = zeros(size(Cc,1),size(Bc,2));
+Ac = [0 1 0; 0 -b/J KK/J; 0 -KK/LL -RR/LL];
+Bc = [0; 0; 1/LL];
+Cc = [1 0 0];
+Dc = [0];
 
-Ts = 5; %Probably in seconds
-
+x0 = [5; 0; -1000]; % initial state
+Ts= 0.1;
+ref = 0; % ref??
 sys_c = ss(Ac,Bc,Cc,Dc);
 sys = c2d(sys_c,Ts);
 
-[A,B,C,D] = dssdata(sys);
-
-safex = [0.3;0;1.5];
-depth = 0.1;
-
-size_x = [size(A,2) 1];
-size_y = [size(C,1) 1]; 
+A = sys.a;
+B = sys.b;
+C = sys.c;
+D = sys.d;
 
 
-%p = 500; 
-%Q = p*C'*C;
-%Q = zeros(size(A));
-%R = zeros(size(C,1),size(C,1)); 
-% Q = [ 0.5 0 0 ;
-%       0 0.1 0;
-%       0 0 0.12;
-%     ];
-id = 3;
-Q = [ 500 0 0 ;
-      0 10 0;
-      0 0 100;
+Q = [ 1 0 0 ;
+      0 0.1 0;
+      0 0 1;
     ];
 
-R = 100;
+R = 0.1;
 R = R*Ts*Ts;
 Q = Q*Ts*Ts;
-[K] = lqrd(Ac,Bc,Q,R,Ts);
+N = zeros(size(Ac,2),size(Bc,2));
+[K] = dlqr(A,B,Q,R,N);
+% K = [16.0302    5.6622]; % LQR gain
 
-% sys_cl = ss(A-B*K, B, C, D);
-% step(0.2*sys_cl)
-% 
-% sys_cl = ss(A-B*K,B,C,D,Ts);
-% QN = 500;
-% RN = 0.01*eye(1);
-% [kest,L,P] = kalman(sys_cl,QN,RN);
 QN = 1;
 RN = 10;
+sys_gain = ss(A- B*K,B,C,D,Ts);
 [kalmf,L,P] = kalman(sys,QN,RN);
-disp("L = ");
-disp(L);
-th_all = [0.1, 0.2, 0.5, 1, 1.5, 2, 3]; % Threshold Values to run with
 
+% A= [1.0000    0.1000;0    1.0000];
+% B= [0.0050;0.1000];
+% C= [1 0];
+% D= [0];
+size_x = [3 1];
+size_y = [1 1]; 
 
-
-timeWindow = 80/Ts;
-sensorAttack = 0.01;
-actuatorAttack = 0.02;
-
+timeWindow = 16;
+sensorAttack = 0;
+actuatorAttack = 0.1;
+safex = [4;20;20];
+depth = 0.1;
 cusum_true = true;
 cusum_cost_mat = [1]; %In case Y is also a vector, then we would require to normalize it
 
- th_arr = zeros(timeWindow,1); %Update it by running the optimal threholds function or read it from a saved file
- if isfile('files/optimal_thresholds.csv')
-    th_arr = readmatrix("files/optimal_thresholds.csv");
- else
-    [TCP_opt, optimal_delays, th_arr] = optimal_adaptive_thresholds();
-     fout = sprintf('files/optimal_thresholds.csv');
-    writematrix(th_arr, fout);    
+th_arr = zeros(timeWindow,1); %Update it by running the optimal threholds function or read it from a saved file
+if isfile('files/optimal_thresholds.csv')
+   th_arr = readmatrix("files/optimal_thresholds.csv");
+else
+    [TCP_opt, optimal_delays, th_arr] = optimal_adaptive_thresholds_sub;
+    fout = sprintf('files/optimal_thresholds.csv');
+   writematrix(th_arr, fout);    
 end
 
 x_plot =zeros(size_x(1),timeWindow);
@@ -79,16 +72,11 @@ close all;
 %Attack-less plot
 sensorAttack_zero = 0;
 actuatorAttack_zero = 0;
-x0 = [0.0; 0; 0.3];
-
-%     x_a = depth*safex;
-%     xhat_a = x_a;'
+x0 = [5; 0; -1000];
     x_a = x0;
     xhat_a = x0;
     u_a = -K*xhat_a;
 
-%     x = depth*safex;
-%     xhat = x;
     x = x0;
     xhat = x0;
     u = -K*xhat;
@@ -101,7 +89,6 @@ x0 = [0.0; 0; 0.3];
             for i=1:timeWindow
                 % Non-attack scenario
                 u_a = u + actuatorAttack_zero;
-                u_a_plot(:,i) = u_a;
                 x = A*x + B*u_a; % state updattion in plant side
                 x_plot(:,i) = x; % This will be the actual state of the plant, which is not observable to the controller though
                 y = C*x + sensorAttack_zero; %sensor output % sensor measurement in plant side + attacker values sensed by the controller
@@ -109,11 +96,9 @@ x0 = [0.0; 0; 0.3];
                 %The estimator gets the non-actuator attack value of u but
                 %sensor attack value is added
                 xhat = A*xhat + B*u + L*r; % state estimation in controller side
-                xhat_plot(:,i) = xhat;
                 u = - K*xhat; % control signal computation in controller side for next actuation
-                u_plot(:,i) = u;
 %                 th = th_arr(i); %We have an optimal value of threshold for all time steps
-%                 
+                
 %                 if cusum_true 
 %                     %S_p = max([0, S_p + r_a]); %If residue is +ve, it is added to S_p, if it was -ve, then S_p drops to a min 0
 %                     %S_n = min([0, S_n + r_a]); %If residue is -ve, it is added to S_n, making it more -ve. If it is +ve, S_n increases, moving towards 0 
@@ -144,15 +129,11 @@ x0 = [0.0; 0; 0.3];
 
             end
       figure();
-      plot((1:timeWindow)*Ts,x_plot(id,:),(1:timeWindow)*Ts,xhat_plot(id,:));
-      title("No Error State");
+      plot(x_plot(1,:));
+      title("No Error");
       
-      figure();
-      plot((1:timeWindow)*Ts,u_plot(1,:),(1:timeWindow)*Ts,u_a_plot(1,:));
-      title("No Error Actuation");
-      
-sensorAttack_zero = 0; %0.05 is a decently large value
-actuatorAttack_zero = 0.01; %0.01 is a very very large value of attack
+sensorAttack_zero = 0;
+actuatorAttack_zero = 0.1;
 
     x_a = depth*safex;
     xhat_a = x_a;
@@ -162,7 +143,7 @@ actuatorAttack_zero = 0.01; %0.01 is a very very large value of attack
     xhat = x;
     u = -K*xhat;
     
-    k_a = 50*1/Ts;
+    k_a = 4;
             d = 0;
             p = 0;
             S_p = zeros(size_x);
@@ -220,8 +201,7 @@ actuatorAttack_zero = 0.01; %0.01 is a very very large value of attack
       title("No Detector CuSum");
       legend("S_p","S_n");
       
-%for k_a = (1:)*1/Ts
- for k_a = (1:Time)*1/Ts
+for k_a = 1:timeWindow
     
     x_a = depth*safex;
     %xhat_a = zeros(size(x_a)); %This is probably wrong, because if the
