@@ -27,7 +27,7 @@ end
 function [cost, delay_opt] = MinimumCostThresholds(P, T)
     timeWindow = T;
     C = 10;  % FP cost
-    Cd = 5; % Threshold Change Cost
+    Cd = 0; % Threshold Change Cost
     
     % Load all mapping files
     load('files/thresh_to_damage', 'th_to_damage')

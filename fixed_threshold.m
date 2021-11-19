@@ -5,7 +5,7 @@ function [optimal_threshold] = fixed_threshold(~)
     delay = 0;
     optimal_loss = Inf;
     C = 0.1;
-    D_table = readtable('files/delay_th=0.05.csv');
+    D_table = readtable('files/delay_th=1.00.csv');
     D_array = table2array(D_table);
     load('files/delay_to_thresh', 'd_to_th')
     P = zeros(timeWindow,timeWindow);

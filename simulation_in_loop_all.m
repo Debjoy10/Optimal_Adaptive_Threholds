@@ -16,7 +16,7 @@ D= [0];
 K = [16.0302    5.6622]; % LQR gain
 L = [0.9902;0.9892]; % Kalman gain
 th_all = [1.9, 2, 2.05, 2.1, 2.15, 2.2, 2.25, 2.3, 2.35, 2.4, 2.45, 2.5, 2.55, 2.6, 2.65, 2.7, 2.75, 2.8, 2.9, 3]; % Threshold Values to run with
-cusum_true = true;
+cusum_true = false;
 cusum_cost_mat = [1]; %In case Y is also a vector, then we would require to normalize it
 size_x = [2 1];
 size_y = [1 1]; 
@@ -85,11 +85,13 @@ for th = th_all
                       end
                       S_p_single = cusum_cost_mat*abs(S_p);
                       S_n_single = cusum_cost_mat*abs(S_n);
-                      if(max(S_p_single,S_n_single)<th)                  
-                          %We also need to count the damage in this case as
-                          %it will be plotted.
-                          d = d + 1;
-                          p = p + norm(x-x_a,inf);
+                      if(max(S_p_single,S_n_single)<th) 
+                          if i >= k_a
+                              %We also need to count the damage in this case as
+                              %it will be plotted.
+                              d = d + 1;
+                              p = p + norm(x-x_a,inf);
+                          end
                       else
                         %Attack is detected, need to break the loop.
                         detected = true;

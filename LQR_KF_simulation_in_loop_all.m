@@ -15,16 +15,16 @@ D= [0];
 
 % K = [16.0302    5.6622]; % LQR gain
 % L = [0.9902;0.9892]; % Kalman gain
-th_all = [2, 3, 4, 5, 6, 7, 100, 150, 200]; % Threshold Values to run with
+th_all = [1.9, 2, 2.05, 2.1, 2.15, 2.2, 2.25, 2.3, 2.35, 2.4, 2.45, 2.5, 2.55, 2.6, 2.65]; % Threshold Values to run with
 cusum_true = true;
 cusum_cost_mat = [1]; %In case Y is also a vector, then we would require to normalize it
 size_x = [2 1];
 size_y = [1 1]; 
 
 % LQR Controller Design
-p = 50000;
+p = 500;
 Q = 1*p*(C'*C);
-R = 0.01;
+R = 0.1;
 [K,S,CLP] = dlqr(A,B,Q,R);
 disp("K = ");
 disp(K);
@@ -44,8 +44,8 @@ for th = th_all
     sensorRange = 30;
     actuatorRange = 36;
     timeWindow = 15;
-    sensorAttack = 2;
-    actuatorAttack = 2;
+    sensorAttack = 0;
+    actuatorAttack = 0;
 
     delay = 100*ones(timeWindow,timeWindow);
     damage = 100*ones(timeWindow,timeWindow);

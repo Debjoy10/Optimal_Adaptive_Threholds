@@ -8,7 +8,6 @@ D= [0];
 
 K = [16.0302    5.6622]; % LQR gain
 L = [0.9902;0.9892]; % Kalman gain
-th_all = [0.1, 0.2, 0.5, 1, 1.5, 2, 3]; % Threshold Values to run with
 
 size_x = [2 1];
 size_y = [1 1]; 
@@ -25,7 +24,7 @@ th_arr = zeros(timeWindow,1); %Update it by running the optimal threholds functi
 if isfile('files/optimal_thresholds.csv')
    th_arr = readmatrix("files/optimal_thresholds.csv");
 else
-    [TCP_opt, optimal_delays, th_arr] = optimal_adaptive_thresholds();
+    [TCP_opt, optimal_delays, th_arr] = optimal_adaptive_thresholds;
     fout = sprintf('files/optimal_thresholds.csv');
    writematrix(th_arr, fout);    
 end
