@@ -8,7 +8,7 @@ Bc = [0.232;0.0203;0];
 Cc = [0 0 1];
 Dc = zeros(size(Cc,1),size(Bc,2));
 
-Ts = 0.02; %Probably in seconds
+Ts = 0.2; %Probably in seconds
 
 sys_c = ss(Ac,Bc,Cc,Dc);
 sys = c2d(sys_c,Ts);
@@ -31,9 +31,9 @@ size_y = [size(C,1) 1];
 %       0 0 0.12;
 %     ];
 id = 3;
-Q = [ 200 0 0 ;
+Q = [ 500 0 0 ;
       0 10 0;
-      0 0 20;
+      0 0 100;
     ];
 
 R = 100;
@@ -57,21 +57,21 @@ th_all = [0.1, 0.2, 0.5, 1, 1.5, 2, 3]; % Threshold Values to run with
 
 
 
-timeWindow = 10000;
+timeWindow = 80/Ts;
 sensorAttack = 0.01;
 actuatorAttack = 0.02;
 
 cusum_true = true;
 cusum_cost_mat = [1]; %In case Y is also a vector, then we would require to normalize it
 
-% th_arr = zeros(timeWindow,1); %Update it by running the optimal threholds function or read it from a saved file
-% if isfile('files/optimal_thresholds.csv')
-%    th_arr = readmatrix("files/optimal_thresholds.csv");
-% else
-%     [TCP_opt, optimal_delays, th_arr] = optimal_adaptive_thresholds();
-%     fout = sprintf('files/optimal_thresholds.csv');
-%    writematrix(th_arr, fout);    
-% end
+ th_arr = zeros(timeWindow,1); %Update it by running the optimal threholds function or read it from a saved file
+ if isfile('files/optimal_thresholds.csv')
+    th_arr = readmatrix("files/optimal_thresholds.csv");
+ else
+    [TCP_opt, optimal_delays, th_arr] = optimal_adaptive_thresholds();
+     fout = sprintf('files/optimal_thresholds.csv');
+    writematrix(th_arr, fout);    
+end
 
 x_plot =zeros(size_x(1),timeWindow);
 close all;
@@ -151,8 +151,8 @@ x0 = [0.0; 0; 0.3];
       plot((1:timeWindow)*Ts,u_plot(1,:),(1:timeWindow)*Ts,u_a_plot(1,:));
       title("No Error Actuation");
       
-sensorAttack_zero = 0;
-actuatorAttack_zero = 5;
+sensorAttack_zero = 0; %0.05 is a decently large value
+actuatorAttack_zero = 0.01; %0.01 is a very very large value of attack
 
     x_a = depth*safex;
     xhat_a = x_a;
@@ -162,7 +162,7 @@ actuatorAttack_zero = 5;
     xhat = x;
     u = -K*xhat;
     
-    k_a = 4;
+    k_a = 50*1/Ts;
             d = 0;
             p = 0;
             S_p = zeros(size_x);
@@ -194,7 +194,7 @@ actuatorAttack_zero = 5;
                 %sensor attack value is added
                 %Call LQR to get value of K for controller gain
                 u = - K*xhat; % control signal computation in controller side for next actuation
-                th = th_arr(i); %We have an optimal value of threshold for all time steps   
+                %th = th_arr(i); %We have an optimal value of threshold for all time steps   
                 
                 for j = 1:size_y(1)
                     S_p(j) = max(0,S_p(j) + r(j));
@@ -220,7 +220,7 @@ actuatorAttack_zero = 5;
       title("No Detector CuSum");
       legend("S_p","S_n");
       
-for k_a = 1:timeWindow
+for k_a = (1:10)*1/Ts
     
     x_a = depth*safex;
     %xhat_a = zeros(size(x_a)); %This is probably wrong, because if the

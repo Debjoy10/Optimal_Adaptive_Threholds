@@ -7,44 +7,99 @@
 clc;
 clear;
 
+% % System: Trajectory tracking
+% A= [1.0000    0.1000;0    1.0000];
+% B= [0.0050;0.1000];
+% C= [1 0];
+% D= [0];
+% 
+% K = [16.0302    5.6622]; % LQR gain
+% L = [0.9902;0.9892]; % Kalman gain
 % System: Trajectory tracking
-A= [1.0000    0.1000;0    1.0000];
-B= [0.0050;0.1000];
-C= [1 0];
-D= [0];
+Ac = [-0.313 56.7 0;-0.0139 -0.426 0;0 56.7 0];
+Bc = [0.232;0.0203;0];
+Cc = [0 0 1];
+Dc = zeros(size(Cc,1),size(Bc,2));
 
-K = [16.0302    5.6622]; % LQR gain
-L = [0.9902;0.9892]; % Kalman gain
-th_all = [1.9, 2, 2.05, 2.1, 2.15, 2.2, 2.25, 2.3, 2.35, 2.4, 2.45, 2.5, 2.55, 2.6, 2.65, 2.7, 2.75, 2.8, 2.9, 3]; % Threshold Values to run with
+Ts = 0.2; %Probably in seconds
+
+sys_c = ss(Ac,Bc,Cc,Dc);
+sys = c2d(sys_c,Ts);
+
+[A,B,C,D] = dssdata(sys);
+
+safex = [0.3;0;1.5];
+depth = 0.1;
+
+size_x = [size(A,2) 1];
+size_y = [size(C,1) 1]; 
+
+
+%p = 500; 
+%Q = p*C'*C;
+%Q = zeros(size(A));
+%R = zeros(size(C,1),size(C,1)); 
+% Q = [ 0.5 0 0 ;
+%       0 0.1 0;
+%       0 0 0.12;
+%     ];
+id = 3;
+Q = [ 500 0 0 ;
+      0 10 0;
+      0 0 100;
+    ];
+
+R = 100;
+R = R*Ts*Ts;
+Q = Q*Ts*Ts;
+[K] = lqrd(Ac,Bc,Q,R,Ts);
+
+% sys_cl = ss(A-B*K, B, C, D);
+% step(0.2*sys_cl)
+% 
+% sys_cl = ss(A-B*K,B,C,D,Ts);
+% QN = 500;
+% RN = 0.01*eye(1);
+% [kest,L,P] = kalman(sys_cl,QN,RN);
+QN = 1;
+RN = 10;
+[kalmf,L,P] = kalman(sys,QN,RN);
+
+%th_all = [1.9, 2, 2.05, 2.1, 2.15, 2.2, 2.25, 2.3, 2.35, 2.4, 2.45, 2.5, 2.55, 2.6, 2.65, 2.7, 2.75, 2.8, 2.9, 3]; % Threshold Values to run with
+th_all = 0.5:0.1:1;
 cusum_true = true;
 cusum_cost_mat = [1]; %In case Y is also a vector, then we would require to normalize it
-size_x = [2 1];
-size_y = [1 1]; 
+
 
 for th = th_all
-    safex = [25;30];
+    safex = [0.3;0;1.5];
     depth = 0.1;
-    sensorRange = 30;
-    actuatorRange = 36;
-    timeWindow = 15;
-    sensorAttack = 2;
-    actuatorAttack = 2;
-
+    sensorRange = 3.14/2;
+    actuatorRange = 3.14/2;
+    timeWindow = 80/Ts;
+    sensorAttack = 0; %0.05 is a decently large value
+    actuatorAttack = 0.01; % 0.01 is a very large value
+    x0 = [0.0; 0; 0.3];
+    
     delay = 100*ones(timeWindow,timeWindow);
     damage = 100*ones(timeWindow,timeWindow);
     for k_a=2:timeWindow %attack start
         for k_e=1:k_a-1 %attack end
-            delay(k_e,k_a) = 100; %a large value indicating attack not possible in this sub-window
+            delay(k_e,k_a) = 10000; %a large value indicating attack not possible in this sub-window
         end
     end
 
     % initialize
-    x_a = depth*safex;
-    xhat_a = zeros(size(x_a));
+%     x_a = depth*safex;
+%     xhat_a = zeros(size(x_a));
+    x_a = x0;
+    xhat_a = x0;
     u_a = -K*xhat_a;
 
-    x = depth*safex;
-    xhat = zeros(size(x));
+%     x = depth*safex;
+%     xhat = zeros(size(x));
+    x = x0;
+    xhat = x0;
     u = -K*xhat;
 
     for k_a=1:timeWindow % attack start
