@@ -2,7 +2,8 @@
 % Runs the optimal adaptive threholds algorithm
 
 function [TCP_opt, optimal_delays, optimal_thresholds] = optimal_adaptive_thresholds(~)
-    timeWindow = 15;
+    Ts = 5;
+    timeWindow = 80/Ts;
     % Set of all damage values and delay to threshold mappings
     load('files/all_damages', 'all_damages')
     load('files/delay_to_thresh', 'd_to_th')

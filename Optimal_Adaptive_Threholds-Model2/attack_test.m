@@ -8,7 +8,7 @@ Bc = [0.232;0.0203;0];
 Cc = [0 0 1];
 Dc = zeros(size(Cc,1),size(Bc,2));
 
-Ts = 0.2; %Probably in seconds
+Ts = 5; %Probably in seconds
 
 sys_c = ss(Ac,Bc,Cc,Dc);
 sys = c2d(sys_c,Ts);
@@ -220,7 +220,8 @@ actuatorAttack_zero = 0.01; %0.01 is a very very large value of attack
       title("No Detector CuSum");
       legend("S_p","S_n");
       
-for k_a = (1:10)*1/Ts
+%for k_a = (1:10)*1/Ts
+ for k_a = (1:timeWindow)
     
     x_a = depth*safex;
     %xhat_a = zeros(size(x_a)); %This is probably wrong, because if the

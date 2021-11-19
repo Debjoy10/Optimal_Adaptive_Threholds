@@ -21,7 +21,7 @@ Bc = [0.232;0.0203;0];
 Cc = [0 0 1];
 Dc = zeros(size(Cc,1),size(Bc,2));
 
-Ts = 0.2; %Probably in seconds
+Ts = 5; %Probably in seconds
 
 sys_c = ss(Ac,Bc,Cc,Dc);
 sys = c2d(sys_c,Ts);
@@ -66,7 +66,8 @@ RN = 10;
 [kalmf,L,P] = kalman(sys,QN,RN);
 
 %th_all = [1.9, 2, 2.05, 2.1, 2.15, 2.2, 2.25, 2.3, 2.35, 2.4, 2.45, 2.5, 2.55, 2.6, 2.65, 2.7, 2.75, 2.8, 2.9, 3]; % Threshold Values to run with
-th_all = 0.5:0.1:1;
+%th_all = 0.5:0.1:1; %For Ts = 0.2
+th_all = 0.06: 0.02: 0.16; %For Ts = 2
 cusum_true = true;
 cusum_cost_mat = [1]; %In case Y is also a vector, then we would require to normalize it
 

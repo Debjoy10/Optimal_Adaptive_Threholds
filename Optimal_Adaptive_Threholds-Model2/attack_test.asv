@@ -6,16 +6,16 @@ clear;
 Ac = [-0.313 56.7 0;-0.0139 -0.426 0;0 56.7 0];
 Bc = [0.232;0.0203;0];
 Cc = [0 0 1];
-Dc = zeros(size(C,1),size(B,2));
+Dc = zeros(size(Cc,1),size(Bc,2));
 
-Ts = 0.02; %Probably in seconds
+Ts = 5; %Probably in seconds
 
 sys_c = ss(Ac,Bc,Cc,Dc);
 sys = c2d(sys_c,Ts);
 
 [A,B,C,D] = dssdata(sys);
 
-safex = [25;30;35];
+safex = [0.3;0;1.5];
 depth = 0.1;
 
 size_x = [size(A,2) 1];
@@ -26,12 +26,20 @@ size_y = [size(C,1) 1];
 %Q = p*C'*C;
 %Q = zeros(size(A));
 %R = zeros(size(C,1),size(C,1)); 
-Q = [ 5 0 0 ;
-      0 1 0;
-      0 0 12;
+% Q = [ 0.5 0 0 ;
+%       0 0.1 0;
+%       0 0 0.12;
+%     ];
+id = 3;
+Q = [ 500 0 0 ;
+      0 10 0;
+      0 0 100;
     ];
-R = 50;
-[K] = lqrd(A,B,Q,R);
+
+R = 100;
+R = R*Ts*Ts;
+Q = Q*Ts*Ts;
+[K] = lqrd(Ac,Bc,Q,R,Ts);
 
 % sys_cl = ss(A-B*K, B, C, D);
 % step(0.2*sys_cl)
@@ -49,20 +57,20 @@ th_all = [0.1, 0.2, 0.5, 1, 1.5, 2, 3]; % Threshold Values to run with
 
 
 
-timeWindow = 15;
+timeWindow = 80/Ts;
 sensorAttack = 0.01;
-actuatorAttack = 00.;
+actuatorAttack = 0.02;
 
 cusum_true = true;
 cusum_cost_mat = [1]; %In case Y is also a vector, then we would require to normalize it
 
-th_arr = zeros(timeWindow,1); %Update it by running the optimal threholds function or read it from a saved file
-if isfile('files/optimal_thresholds.csv')
-   th_arr = readmatrix("files/optimal_thresholds.csv");
-else
+ th_arr = zeros(timeWindow,1); %Update it by running the optimal threholds function or read it from a saved file
+ if isfile('files/optimal_thresholds.csv')
+    th_arr = readmatrix("files/optimal_thresholds.csv");
+ else
     [TCP_opt, optimal_delays, th_arr] = optimal_adaptive_thresholds();
-    fout = sprintf('files/optimal_thresholds.csv');
-   writematrix(th_arr, fout);    
+     fout = sprintf('files/optimal_thresholds.csv');
+    writematrix(th_arr, fout);    
 end
 
 x_plot =zeros(size_x(1),timeWindow);
@@ -71,13 +79,18 @@ close all;
 %Attack-less plot
 sensorAttack_zero = 0;
 actuatorAttack_zero = 0;
+x0 = [0.0; 0; 0.3];
 
-    x_a = depth*safex;
-    xhat_a = x_a;
+%     x_a = depth*safex;
+%     xhat_a = x_a;'
+    x_a = x0;
+    xhat_a = x0;
     u_a = -K*xhat_a;
 
-    x = depth*safex;
-    xhat = x;
+%     x = depth*safex;
+%     xhat = x;
+    x = x0;
+    xhat = x0;
     u = -K*xhat;
                 
             d = 0;
@@ -88,6 +101,7 @@ actuatorAttack_zero = 0;
             for i=1:timeWindow
                 % Non-attack scenario
                 u_a = u + actuatorAttack_zero;
+                u_a_plot(:,i) = u_a;
                 x = A*x + B*u_a; % state updattion in plant side
                 x_plot(:,i) = x; % This will be the actual state of the plant, which is not observable to the controller though
                 y = C*x + sensorAttack_zero; %sensor output % sensor measurement in plant side + attacker values sensed by the controller
@@ -95,44 +109,50 @@ actuatorAttack_zero = 0;
                 %The estimator gets the non-actuator attack value of u but
                 %sensor attack value is added
                 xhat = A*xhat + B*u + L*r; % state estimation in controller side
+                xhat_plot(:,i) = xhat;
                 u = - K*xhat; % control signal computation in controller side for next actuation
-                th = th_arr(i); %We have an optimal value of threshold for all time steps
-                
-                if cusum_true 
-                    %S_p = max([0, S_p + r_a]); %If residue is +ve, it is added to S_p, if it was -ve, then S_p drops to a min 0
-                    %S_n = min([0, S_n + r_a]); %If residue is -ve, it is added to S_n, making it more -ve. If it is +ve, S_n increases, moving towards 0 
-                      for j = 1:size_y(1)
-                          S_p(j) = max(0,S_p(j) + r(j));
-                          S_n(j) = min(0,S_n(j) + r(j));
-                      end
-                      S_p_single = cusum_cost_mat*abs(S_p);
-                      S_n_single = cusum_cost_mat*abs(S_n);
-                      if(max(S_p_single,S_n_single)<th)                  
-                          %We also need to count the damage in this case as
-                          %it will be plotted.
-                            d = d + 1;
-                      else
-                          %Attack is detected, need to break the loop.
-                        break;
-                      end
-                else
-                    if norm(r,inf)<th
-                       % if i >= k_a% you can use any norm here. But CUSUM is suggested as it is given in the paper
-                           d = d + 1;
-                       % end
-                    else
-                        break;
-                    end
-                
-                end
+                u_plot(:,i) = u;
+%                 th = th_arr(i); %We have an optimal value of threshold for all time steps
+%                 
+%                 if cusum_true 
+%                     %S_p = max([0, S_p + r_a]); %If residue is +ve, it is added to S_p, if it was -ve, then S_p drops to a min 0
+%                     %S_n = min([0, S_n + r_a]); %If residue is -ve, it is added to S_n, making it more -ve. If it is +ve, S_n increases, moving towards 0 
+%                       for j = 1:size_y(1)
+%                           S_p(j) = max(0,S_p(j) + r(j));
+%                           S_n(j) = min(0,S_n(j) + r(j));
+%                       end
+%                       S_p_single = cusum_cost_mat*abs(S_p);
+%                       S_n_single = cusum_cost_mat*abs(S_n);
+%                       if(max(S_p_single,S_n_single)<th)                  
+%                           %We also need to count the damage in this case as
+%                           %it will be plotted.
+%                             d = d + 1;
+%                       else
+%                           %Attack is detected, need to break the loop.
+%                         break;
+%                       end
+%                 else
+%                     if norm(r,inf)<th
+%                        % if i >= k_a% you can use any norm here. But CUSUM is suggested as it is given in the paper
+%                            d = d + 1;
+%                        % end
+%                     else
+%                         break;
+%                     end
+%                 
+%                 end
 
             end
       figure();
-      plot(x_plot(1,:));
-      title("No Error");
+      plot((1:timeWindow)*Ts,x_plot(id,:),(1:timeWindow)*Ts,xhat_plot(id,:));
+      title("No Error State");
       
-sensorAttack_zero = 0;
-actuatorAttack_zero = 5;
+      figure();
+      plot((1:timeWindow)*Ts,u_plot(1,:),(1:timeWindow)*Ts,u_a_plot(1,:));
+      title("No Error Actuation");
+      
+sensorAttack_zero = 0; %0.05 is a decently large value
+actuatorAttack_zero = 0.01; %0.01 is a very very large value of attack
 
     x_a = depth*safex;
     xhat_a = x_a;
@@ -142,7 +162,7 @@ actuatorAttack_zero = 5;
     xhat = x;
     u = -K*xhat;
     
-    k_a = 4;
+    k_a = 50*1/Ts;
             d = 0;
             p = 0;
             S_p = zeros(size_x);
@@ -174,7 +194,7 @@ actuatorAttack_zero = 5;
                 %sensor attack value is added
                 %Call LQR to get value of K for controller gain
                 u = - K*xhat; % control signal computation in controller side for next actuation
-                th = th_arr(i); %We have an optimal value of threshold for all time steps   
+                %th = th_arr(i); %We have an optimal value of threshold for all time steps   
                 
                 for j = 1:size_y(1)
                     S_p(j) = max(0,S_p(j) + r(j));
@@ -200,7 +220,8 @@ actuatorAttack_zero = 5;
       title("No Detector CuSum");
       legend("S_p","S_n");
       
-for k_a = 1:timeWindow
+%for k_a = (1:)*1/Ts
+ for k_a = (1:Time)*1/Ts
     
     x_a = depth*safex;
     %xhat_a = zeros(size(x_a)); %This is probably wrong, because if the
