@@ -1,104 +1,44 @@
 % CPS Group-2: Adaptive attack detector for dynamical systems
 % Runs simulation and stores delay/damage values
-% Simulation for different threhold values
-% Constant Kalmann and LQR gains
-% Both Detectors Supported
 
 clc;
 clear;
 
-% System: motor position control
-J = 3.2284E-6;
-b = 3.5077E-6;
-KK = 0.0274;
-RR = 4;
-LL = 2.75E-6;
+% System: Trajectory tracking
+A= [1.0000    0.1000;0    1.0000];
+B= [0.0050;0.1000];
+C= [1 0];
+D= [0];
 
-Aa = [0 1 0; 0 -b/J KK/J; 0 -KK/LL -RR/LL];
-Bb = [0; 0; 1/LL];
-Cc = [1 0 0];
-Dd = [0];
+K = [16.0302    5.6622]; % LQR gain
+L = [0.9902;0.9892]; % Kalman gain
+th_all = [0.1, 0.2, 0.5, 1, 1.5, 2, 3]; % Threshold Values to run with
 
-x0 = [1;1;0]; % initial state
-Ts= 0.1;
-ref = 0; % ref??
-dcmotor = ss(Aa,Bb,Cc,Dd);
-sys_ss = dcmotor;
-sys_d = c2d(sys_ss,Ts,'zoh'); %  'zoh' - Zero-order hold on the inputs
-
-A = sys_d.a;
-B = sys_d.b;
-C = sys_d.c;
-D = sys_d.d;
-
-
-p = 50000; %??
-Q = [100 0 0; 0 10 0; 0 0 0.1]*0.1;
-% R = 5;
-
-% Q = [1 0 0; 0 1 0; 0 0 1];
-R = 1000;
-
-[K,S,CLP] = dlqr(A,B,Q,R);
-% K = [16.0302    5.6622]; % LQR gain
-
-QN = 50;
-RN = 0.1*eye(1); % identity matrix
-% [kalmf,L1,P1,M1] = kalmd(sys_ss,QN,RN,Ts); % descrete function
-% L1
-[kest,L,P] = kalman(sys_d,QN,RN); % Kalman gain
-
-
-th_all = linspace(1.4,1.5,49);%[0, 10, 20,  180]; % Threshold Values to run with
-
-% th_all(end+1) = 1.3833;
-% th_all(end+1) = 1.4250;
-% th_all(end+1) = 1.4398;
-% th_all(end+1) = 1.4337;
-% th_all(end+1) = 1.4518;
-% th_all(end+1) = 1.4446;
-% th_all(end+1) = 1.4542;
-% th_all(end+1) = 1.4639;
-% th_all(end+1) = 1.4699;
-% th_all(end+1) = 1.4708;
-% th_all(end+1) = 1.4819;
-% th_all(end+1) = 1.4875;
-cusum_true = false;
-cusum_cost_mat = [1]; %In case Y is also a vector, then we would require to normalize it
-size_x = [3 1];
+size_x = [2 1];
 size_y = [1 1]; 
-u_list = [];
 
-% sensorRange = [-4;4];
-% actuatorRange = [-5;5]; 
-% safex = [-4,-20,0;4,20,20];
-
-% sensorRange = 4;
-% actuatorRange = 5;
+cusum_true = true;
+cusum_cost_mat = [1]; %In case Y is also a vector, then we would require to normalize it
 
 for th = th_all
-    safex = [4;20;20]; % 3*1
+    safex = [25;30];
     depth = 0.1;
-    timeWindow = 25;
-    sensorAttack = 0.5;%2;
-    actuatorAttack = 0.5;%2;
+    sensorRange = 30;
+    actuatorRange = 36;
+    timeWindow = 15;
+    sensorAttack = 2;
+    actuatorAttack = 2;
 
-    delay = 100*ones(timeWindow,timeWindow);
-    damage = 100*ones(timeWindow,timeWindow);
+    delay = zeros(timeWindow,timeWindow);
+    damage = zeros(timeWindow,timeWindow);
     for k_a=2:timeWindow %attack start
         for k_e=1:k_a-1 %attack end
             delay(k_e,k_a) = 100; %a large value indicating attack not possible in this sub-window
         end
     end
 
-    % initialize
-    x_a = depth*safex;
-    xhat_a = zeros(size(x_a));
-    u_a = -K*xhat_a;
+    %Should this not be in the loop k_a and k_b
 
-    x = depth*safex;
-    xhat = zeros(size(x));
-    u = -K*xhat;
 
     for k_a=1:timeWindow % attack start
         for k_e=k_a:timeWindow % attack end
@@ -106,7 +46,20 @@ for th = th_all
             p = 0;
             S_p = zeros(size_x);
             S_n = zeros(size_x);
-            detected = false;
+            
+            % initialize
+            x_a = depth*safex;
+            %xhat_a = zeros(size(x_a));
+            xhat_a = x_a;
+            u_a = -K*xhat_a;
+
+            x = depth*safex;
+            %xhat = zeros(size(x));
+            xhat = x;
+            u = -K*xhat;
+            
+            r_a = zeros(size_y);
+    
             for i=1:timeWindow
                 % Non-attack scenario
                 x = A*x + B*u; % state updattion in plant side
@@ -114,59 +67,54 @@ for th = th_all
                 r = y - C*xhat; % residue computation in controller side
                 xhat = A*xhat + B*u + L*r; % state estimation in controller side
                 u = - K*xhat; % control signal computation in controller side
-                u_list(end+1) = u;
+
                 % attack scenario
                 if i>=k_a && i<=k_e % attack window
                     x_a = A*x_a + B*(u_a + actuatorAttack);
                 else
                     x_a = A*x_a + B*u_a;
                 end
-                
                 y_a = C*x_a; %sensor output
                 if i>=k_a && i<=k_e % attack window
                     y_a = y_a + sensorAttack;
                 end
-                r_a = y_a - C*xhat_a; % residue
                 xhat_a = A*xhat_a + B*u_a + L*r_a;
+                r_a = y_a - C*xhat_a; % residue
                 u_a = - K*xhat_a;
-
+                
                 if cusum_true 
-                      %S_p = max([0, S_p + r_a]); %If residue is +ve, it is added to S_p, if it was -ve, then S_p drops to a min 0
-                      %S_n = min([0, S_n + r_a]); %If residue is -ve, it is added to S_n, making it more -ve. If it is +ve, S_n increases, moving towards 0 
+                    %S_p = max([0, S_p + r_a]); %If residue is +ve, it is added to S_p, if it was -ve, then S_p drops to a min 0
+                    %S_n = min([0, S_n + r_a]); %If residue is -ve, it is added to S_n, making it more -ve. If it is +ve, S_n increases, moving towards 0 
                       for j = 1:size_y(1)
                           S_p(j) = max(0,S_p(j) + r_a(j));
                           S_n(j) = min(0,S_n(j) + r_a(j));
                       end
                       S_p_single = cusum_cost_mat*abs(S_p);
                       S_n_single = cusum_cost_mat*abs(S_n);
-                      if(max(S_p_single,S_n_single)<th) 
-                          if i >= k_a
-                              %We also need to count the damage in this case as
-                              %it will be plotted.
-                              d = d + 1;
-                              p = p + norm(x-x_a,inf);
-                          end
+                      if(max(S_p_single,S_n_single)<th)
+                        d = d + 1;
+                        p = p + norm(x-x_a,inf);
                       else
-                        %Attack is detected, need to break the loop.
-                        detected = true;
                         break;
                       end
                 else
                     if norm(r_a,inf)<th
-                       if i >= k_a% you can use any norm here. But CUSUM is suggested as it is given in the paper
+                        if i >= k_a% you can use any norm here. But CUSUM is suggested as it is given in the paper
                            d = d + 1;
-                           p = p + norm(x-x_a,inf);
-                       end
+                          p = p + norm(x-x_a,inf);
+                        end
                     else
-                        detected = true;
                         break;
                     end
+                
                 end
+
             end
-            if detected == true
-                % Store Delay and Payoff
+            if d>0
                 delay(k_e,k_a) = d;
                 damage(k_e,k_a) = p;
+            else
+                delay(k_e,k_a) = timeWindow-k_a;
             end
         end
     end
@@ -179,7 +127,7 @@ for th = th_all
 end
 
 % Extract Delay to Threshold Mapping
-d_to_th = containers.Map('KeyType','double','ValueType','double');
+d_to_th = containers.Map('KeyType','uint32','ValueType','double');
 
 % Store delay - th = max threshold that can lead to delay
 for th = sort(th_all)
@@ -219,7 +167,3 @@ save('files/delay_to_thresh', 'd_to_th'); % load('files/delay_to_thresh', 'd_to_
 save('files/thresh_to_damage', 'th_to_damage'); % load('files/thresh_to_damage', 'th_to_damage')
 save('files/all_delays', 'all_delays');
 save('files/all_damages', 'all_damages');
-
-
-keys(d_to_th)
-values(d_to_th)
